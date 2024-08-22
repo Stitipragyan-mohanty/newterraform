@@ -1,0 +1,114 @@
+resource "aws_instance" "ec2" {
+  ami = "ami-02b49a24cfb95941c"
+  instance_type = "t2.micro"
+  key_name = "serverr1"
+  subnet_id = aws_subnet.public.id
+  vpc_security_group_ids = [aws_security_group.allow_tls.id]
+  tags = {
+    name = "server-2"
+  }
+}
+
+resource "aws_vpc" "custom" {
+  cidr_block = "10.0.0.0/16"
+}
+
+resource "aws_internet_gateway" "custom" {
+    vpc_id = aws_vpc.custom.id
+    tags = {
+      name = "myvpc-01"
+    }
+  
+}
+
+resource "aws_eip" "web" {
+  instance = aws_instance.ec2.id
+  domain   = "vpc"
+}
+
+resource "aws_eip_association" "eip_assoc" {
+  instance_id   = aws_instance.ec2.id
+  allocation_id = aws_eip.web.id
+}
+
+
+
+resource "aws_nat_gateway" "nat" {
+  connectivity_type = "private"
+  subnet_id         = aws_subnet.private.id
+  depends_on = [aws_internet_gateway.custom]
+  tags = {
+    Name = "gw-NAT"
+  }
+}
+
+resource "aws_subnet" "public" {
+    vpc_id = aws_vpc.custom.id
+    cidr_block = "10.0.0.0/24"
+    availability_zone = "ap-south-1a"
+    tags = {
+      name = "subnet-1"
+    }
+}
+
+    resource "aws_subnet" "private" {
+    vpc_id = aws_vpc.custom.id
+    cidr_block = "10.0.1.0/24"
+    availability_zone = "ap-south-1b"
+    tags = {
+      name = "subnet-2"
+    }
+  
+}
+
+resource "aws_route_table" "name" {
+    vpc_id = aws_vpc.custom.id
+    route {
+        gateway_id = aws_internet_gateway.custom.id
+        cidr_block = "0.0.0.0/0"
+    }
+  
+}
+
+resource "aws_route_table_association" "name" {
+    route_table_id = aws_route_table.name.id
+    subnet_id = aws_subnet.public.id
+  
+}
+
+resource "aws_security_group" "allow_tls" {
+  name = "allow_tls"
+  vpc_id = aws_vpc.custom.id
+  tags = {
+    name = "SG-01"
+  }
+
+ingress {
+    description = "tls from vpc"
+    from_port="80"
+    to_port="80"
+    protocol = "TCP"
+    cidr_blocks = ["0.0.0.0/0"]
+}
+
+ingress {
+    description = "tls from vpc"
+    from_port="22"
+    to_port="22"
+    protocol = "TCP"
+    cidr_blocks = ["0.0.0.0/0"]
+}
+
+egress {
+    description = "tls from vpc"
+    from_port = "0"
+    to_port = "0"
+    protocol = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+}
+
+
+
+
+
+}
